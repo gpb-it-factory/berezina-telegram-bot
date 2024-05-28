@@ -42,11 +42,11 @@ Thumbs.db
 application.yml
 
 # Ignore HTTP Client requests (for IntelliJ IDEA)
-.httpRequests/
+/httpRequests/
 
-# Default ignored files for shelf and data sources
 /shelf/
 /dataSources/
 /dataSources.local.xml
 
+# Ignore HELP.md file
 HELP.md
