@@ -49,3 +49,4 @@ application.yml
 /dataSources/
 /dataSources.local.xml
 
+HELP.md
