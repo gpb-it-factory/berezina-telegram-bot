@@ -1,4 +1,4 @@
-package com.sabinaber.berezinabot.config;
+package com.sabinaber.berezinabot.infrastructure.config;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.context.annotation.Bean;

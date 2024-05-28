@@ -5,13 +5,13 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-public class PingCommandStrategy implements CommandStrategy {
+public class UserRegistrationCommandStrategy implements CommandStrategy {
 
     @Override
     public void invoke(String messageText, long chatId, TelegramLongPollingBot bot) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
-        message.setText("pong");
+        message.setText("registration");
         try {
             bot.execute(message);
         } catch (TelegramApiException e) {
@@ -21,17 +21,6 @@ public class PingCommandStrategy implements CommandStrategy {
 
     @Override
     public String getCommand() {
-        return "/ping";
+        return "/register";
     }
 }
-
-
-
-
-
-
-
-
-
-
-
