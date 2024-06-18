@@ -19,6 +19,7 @@ logs/
 
 # Ignore specific file patterns
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
