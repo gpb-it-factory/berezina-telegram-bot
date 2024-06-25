@@ -5,7 +5,6 @@ import com.sabinaber.berezinabot.adapters.handler.CommandHandler;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -39,11 +38,8 @@ public class BotConfig {
         return new TelegramBot(botToken, botUsername, options, commandHandler);
     }
 
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
 }
+
 
 
 

@@ -6,7 +6,7 @@ import com.sabinaber.berezinabot.adapters.strategy.impl.PingCommandStrategy;
 import com.sabinaber.berezinabot.adapters.strategy.impl.UserRegistrationCommandStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 
@@ -14,8 +14,8 @@ import java.util.List;
 public class CommandConfig {
 
     @Bean
-    public CommandHandler commandHandler(List<CommandStrategy> strategyList, RestTemplate restTemplate) {
-        return new CommandHandler(strategyList, restTemplate);
+    public CommandHandler commandHandler(List<CommandStrategy> strategyList, WebClient webClient) {
+        return new CommandHandler(strategyList, webClient);
     }
 
     @Bean
@@ -28,6 +28,7 @@ public class CommandConfig {
         return new UserRegistrationCommandStrategy();
     }
 }
+
 
 
 
