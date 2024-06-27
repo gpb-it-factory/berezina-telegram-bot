@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import javax.annotation.PostConstruct;
+
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
 
@@ -30,6 +32,12 @@ public class TelegramBot extends TelegramLongPollingBot {
         this.commandHandler = commandHandler;
     }
 
+    @PostConstruct
+    public void init() {
+        logger.info("Initializing Telegram bot...");
+        commandHandler.loadCommands();
+    }
+
     @Override
     public String getBotUsername() {
         return botUsername;
@@ -44,19 +52,32 @@ public class TelegramBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
             MessageHandler messageHandler = new MessageHandler(update.getMessage());
-            logger.info("Received message: {} from chatId: {}", update.getMessage().getText(), messageHandler.getChatId());
-            if (messageHandler.isCommand()) {
-                commandHandler.handleCommand(messageHandler, this);
+            logger.info("Received message: {} from chatId: {}", messageHandler.getCommand(), messageHandler.getChatId());
+            if (commandHandler.isCommandAvailable(messageHandler.getCommand())) {
+                String response = commandHandler.forwardToMiddleLayer(messageHandler).getBody();
+                handleTextMessage(response, messageHandler.getChatId());
             } else {
-                handleTextMessage(messageHandler.getCommandData(), messageHandler.getChatId());
+                sendUnknownCommandMessage(messageHandler.getChatId());
             }
+        }
+    }
+
+    private void sendUnknownCommandMessage(long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Unknown command");
+        try {
+            execute(message);
+            logger.info("Sent unknown command message to chatId: {}", chatId);
+        } catch (TelegramApiException e) {
+            logger.error("Failed to send unknown command message", e);
         }
     }
 
     private void handleTextMessage(String text, long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
-        message.setText("Received text message: " + text);
+        message.setText(text);
         try {
             execute(message);
         } catch (TelegramApiException e) {

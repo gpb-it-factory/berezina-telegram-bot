@@ -32,10 +32,6 @@ public class MessageHandler {
         return messageText;
     }
 
-    public boolean isCommand() {
-        return command != null;
-    }
-
     public String getCommand() {
         return command;
     }
@@ -51,4 +47,6 @@ public class MessageHandler {
     public String getUserName() {
         return userName;
     }
+
+
 }
