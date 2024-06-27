@@ -1,12 +1,20 @@
 package com.sabinaber.berezinabot.adapters.handler;
 
+import com.sabinaber.berezinabot.dto.ExecuteCommandRequestDTO;
+import com.sabinaber.berezinabot.dto.ExecuteCommandResponseDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 @Component
 public class CommandHandler {
@@ -19,116 +27,96 @@ public class CommandHandler {
         this.webClient = webClient;
     }
 
-    public void loadCommands() {
-        String url = "http://localhost:8082/api/commands";
-//        webClient.get()
-//                .uri(url)
-//                .retrieve()
-//                .bodyToFlux(String.class)
-//                .doOnNext(command -> commandSet.addAll(Arrays.asList(command.split(","))))
-//                .doOnComplete(() -> logger.info("Loaded commands from middle layer: {}", commandSet))
-//                .doOnError(e -> logger.error("Failed to load commands from middle layer", e))
-//                .subscribe();
-//        Flux<String> responseFlux = webClient.get()
-//                .uri(url) // замените на ваш URL
-//                .retrieve()
-//                .bodyToFlux(String.class);
-//
-//        responseFlux.subscribe(command -> {
-//            commandSet.add(command);
-//            logger.info("Loaded command: {}", command);
-//        }, e -> {
-//            logger.error("Failed to communicate with middle layer", e);
-//        }, () -> {
-//            logger.info("Loaded commands from middle layer: {}", commandSet);
-//        });
-//        Mono<List<List<String>>> responseMono = webClient.get()
-//                .uri(url) // замените на ваш URL
-//                .retrieve()
-//                .bodyToMono((new ParameterizedTypeReference<List<List<String>>>() {}));
-//
-//        responseMono.subscribe(response -> {
-//            response.forEach(innerList -> commandSet.addAll(innerList));
-//            logger.info("Loaded commands from middle layer: {}", commandSet);
-//        }, e -> {
-//            logger.error("Failed to communicate with middle layer", e);
-//        });
+    @Scheduled(fixedRate = 60000) // Попытка загрузки команд каждые 60 секунд
+    @Async
+    public CompletableFuture<Void> loadCommands() {
+        return CompletableFuture.runAsync(() -> {
+            String url = "http://localhost:8082/api/commands";
+            try {
+                ResponseEntity<String> response = webClient.get()
+                        .uri(url)
+                        .retrieve()
+                        .toEntity(String.class)
+                        .block();
 
-
-        ResponseEntity<String> response = webClient.get()
-                .uri(url)
-                .retrieve()
-                .toEntity(String.class)
-                .block();
-        if (response != null) {
-            String responseBody = response.getBody().substring(1, response.getBody().length() - 1);
-            String[] commands = responseBody.split(",");
-            for (String command : commands) {
-                logger.info("Command: {}", command);
-                String cleanCommand = command.substring(1, command.length() - 1);
-                commandSet.add(cleanCommand);
+                if (response != null) {
+                    String responseBody = response.getBody().substring(1, response.getBody().length() - 1);
+                    String[] commands = responseBody.split(",");
+                    for (String command : commands) {
+                        logger.info("Command: {}", command);
+                        String cleanCommand = command.substring(1, command.length() - 1);
+                        commandSet.add(cleanCommand);
+                    }
+                    logger.info("Loaded commands from middle layer: {}", response.getBody());
+                } else {
+                    logger.error("Failed to load commands from middle layer");
+                }
+            } catch (Exception e) {
+                logger.error("Error loading commands from middle layer", e);
             }
-            commandSet.add("/ping");
-            logger.info("Loaded commands from middle layer: {}", response.getBody());
-        } else {
-            logger.error("Failed to load commands from middle layer");
-        }
+        });
     }
 
     public boolean isCommandAvailable(String command) {
         logger.info("Checking if command is available: {}", command);
         logger.info("Available commands: {}", commandSet);
-        logger.info("Check bool: {}", commandSet.contains(command));
         return commandSet.contains(command);
     }
 
-
-//    public void handleCommand(MessageHandler message, TelegramLongPollingBot bot) {
-//        logger.info("Handling command: {} with data: {} for chatId: {}, username: {}", message.getCommand(), message.getCommandData(), message.getChatId(), message.getUserName());
-//
-//        CommandStrategy strategy = strategies.get(message.getCommand());
-//
-//        if (strategy != null) {
-//            logger.info("Found strategy for command: {}", message.getCommand());
-//            strategy.invoke(message.getCommandData(), message.getChatId(), bot);
-//        } else {
-//            logger.warn("No strategy found for command: {}. Forwarding to middle layer.", message.getCommand());
-//            forwardToMiddleLayer(message.getCommand(), message.getCommandData(), message.getChatId(), bot);
-//        }
-//    }
-
-    public ResponseEntity<String> forwardToMiddleLayer(MessageHandler message) {
+    public ExecuteCommandResponseDTO forwardToMiddleLayer(String command, String commandData, long chatId) {
         String url = "http://localhost:8082/api/execute";
-        Map<String, String> params = new HashMap<>();
-        params.put("command", message.getCommand());
-        params.put("commandData", message.getCommandData());
-        params.put("chatId", String.valueOf(message.getChatId()));
+        ExecuteCommandRequestDTO request = new ExecuteCommandRequestDTO();
+        request.setCommand(command);
+        request.setCommandData(commandData);
+        request.setChatId(chatId);
 
-        ResponseEntity<String> response = webClient.post()
-                .uri(url)
-                .bodyValue(params)
-                .retrieve()
-                .toEntity(String.class)
-                .block();
-        if (response != null) {
-            logger.info("Response from middle layer: {}", response.getBody());
-        } else {
-            logger.error("Failed to communicate with middle layer");
+        try {
+            ResponseEntity<ExecuteCommandResponseDTO> response = webClient.post()
+                    .uri(url)
+                    .bodyValue(request)
+                    .retrieve()
+                    .toEntity(ExecuteCommandResponseDTO.class)
+                    .block();
+
+            if (response != null) {
+                logger.info("Response from middle layer: {}", Objects.requireNonNull(response.getBody()).getResponseMessage());
+                return response.getBody();
+            } else {
+                logger.error("Failed to communicate with middle layer");
+                ExecuteCommandResponseDTO errorResponse = new ExecuteCommandResponseDTO();
+                errorResponse.setResponseMessage("Failed to communicate with middle layer");
+                return errorResponse;
+            }
+        } catch (WebClientResponseException e) {
+            logger.error("Error during communication with middle layer", e);
+            ExecuteCommandResponseDTO errorResponse = new ExecuteCommandResponseDTO();
+            errorResponse.setResponseMessage("Service unavailable. Please try again later.");
+            return errorResponse;
+        } catch (Exception e) {
+            logger.error("Unexpected error during communication with middle layer", e);
+            ExecuteCommandResponseDTO errorResponse = new ExecuteCommandResponseDTO();
+            errorResponse.setResponseMessage("Service unavailable due to unexpected error. Please try again later.");
+            return errorResponse;
         }
-        return response;
-//        ResponseEntity<String> result = webClient.post()
-//                .uri(url)
-//                .bodyValue(params)
-//                .retrieve()
-//                .bodyToMono(String.class)
-//                .doOnNext(response -> logger.info("Response from middle layer: {}", response))
-//                .doOnError(e -> {
-//                    logger.error("Failed to communicate with middle layer", e);
-//                })
-//                .block();
     }
 
+    public boolean isMiddleLayerAvailable() {
+        String url = "http://localhost:8082/api/commands";
+        try {
+            ResponseEntity<String> response = webClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .toEntity(String.class)
+                    .block();
+
+            return response != null;
+        } catch (Exception e) {
+            logger.error("Middle layer is unavailable", e);
+            return false;
+        }
+    }
 }
+
 
 
 

@@ -2,7 +2,9 @@ package com.sabinaber.berezinabot.adapters.bot;
 
 import com.sabinaber.berezinabot.adapters.handler.CommandHandler;
 import com.sabinaber.berezinabot.adapters.handler.MessageHandler;
+import com.sabinaber.berezinabot.dto.ExecuteCommandResponseDTO;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -33,8 +35,12 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     @PostConstruct
+    @Async
     public void init() {
         logger.info("Initializing Telegram bot...");
+        if (!commandHandler.isMiddleLayerAvailable()) {
+            logger.error("Middle layer service is unavailable during initialization");
+        }
         commandHandler.loadCommands();
     }
 
@@ -52,12 +58,22 @@ public class TelegramBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
             MessageHandler messageHandler = new MessageHandler(update.getMessage());
-            logger.info("Received message: {} from chatId: {}", messageHandler.getCommand(), messageHandler.getChatId());
+            long chatId = messageHandler.getChatId();
+            logger.info("Received message: {} from chatId: {}", messageHandler.getCommand(), chatId);
+
+            if (!commandHandler.isMiddleLayerAvailable()) {
+                sendServiceUnavailableMessage(chatId);
+                return;
+            }
+
             if (commandHandler.isCommandAvailable(messageHandler.getCommand())) {
-                String response = commandHandler.forwardToMiddleLayer(messageHandler).getBody();
-                handleTextMessage(response, messageHandler.getChatId());
+                ExecuteCommandResponseDTO response = commandHandler.forwardToMiddleLayer(
+                        messageHandler.getCommand(),
+                        messageHandler.getCommandData(),
+                        chatId);
+                handleTextMessage(response.getResponseMessage(), chatId);
             } else {
-                sendUnknownCommandMessage(messageHandler.getChatId());
+                sendUnknownCommandMessage(chatId);
             }
         }
     }
@@ -80,11 +96,26 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setText(text);
         try {
             execute(message);
+            logger.info("Sent text message to chatId: {}", chatId);
         } catch (TelegramApiException e) {
             logger.error("Failed to send text message response", e);
         }
     }
+
+    private void sendServiceUnavailableMessage(long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Service unavailable. Please try again later.");
+        try {
+            execute(message);
+            logger.info("Sent service unavailable message to chatId: {}", chatId);
+        } catch (TelegramApiException e) {
+            logger.error("Failed to send service unavailable message", e);
+        }
+    }
 }
+
+
 
 
 
